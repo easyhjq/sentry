@@ -49,7 +49,7 @@ setup_pyenv() {
           pyenv install --patch 3.6.10 < \
           <(curl -sSL https://github.com/python/cpython/commit/8ea6353.patch)
     else
-        @cat .python-version | xargs -n1 pyenv install --skip-existing
+        pyenv install --skip-existing < .python-version | xargs -n1
     fi
   else
     echo "!!! pyenv not found, try running bootstrap script again or run \`brew bundle\` in the sentry repo"

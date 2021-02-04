@@ -57,6 +57,8 @@ jobs:
         shell: bash
         # XXX: Can we cache the installed Python environments?
         run: |
+          echo $PATH
+          cat .python-version
           make setup-pyenv
           echo "::set-output name=python-version::$(python -V  | sed s/Python\ //g)"
 
