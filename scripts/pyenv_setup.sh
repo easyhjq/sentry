@@ -3,6 +3,7 @@
 #
 # Assumptions:
 # - This script assumes you're calling from the top directory of the repository
+set -eu
 
 # Check if a command is available
 require() {
