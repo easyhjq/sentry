@@ -5,9 +5,10 @@ import Item from './item';
 
 export type SortableItemProps = Pick<
   React.ComponentProps<typeof Item>,
-  'renderItem' | 'index' | 'wrapperStyle' | 'innerWrapperStyle' | 'disabled'
+  'renderItem' | 'index' | 'wrapperStyle' | 'innerWrapperStyle'
 > & {
   id: string;
+  disabled?: boolean;
 };
 
 function SortableItem({
@@ -31,7 +32,6 @@ function SortableItem({
     <Item
       forwardRef={setNodeRef}
       value={id}
-      disabled={disabled}
       sorting={isSorting}
       renderItem={renderItem}
       index={index}

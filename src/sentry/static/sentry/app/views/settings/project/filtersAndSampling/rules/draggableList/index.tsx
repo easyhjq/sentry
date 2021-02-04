@@ -6,13 +6,11 @@ import {arrayMove, SortableContext, verticalListSortingStrategy} from '@dnd-kit/
 import Item, {ItemProps} from './item';
 import SortableItem, {SortableItemProps} from './sortableItem';
 
-type Props = Pick<
-  ItemProps,
-  'disabled' | 'renderItem' | 'innerWrapperStyle' | 'wrapperStyle'
-> & {
-  items: Array<string>;
-  onUpdateItems: (items: Array<string>) => void;
-};
+type Props = Pick<ItemProps, 'renderItem' | 'innerWrapperStyle' | 'wrapperStyle'> &
+  Pick<SortableItemProps, 'disabled'> & {
+    items: Array<string>;
+    onUpdateItems: (items: Array<string>) => void;
+  };
 
 type State = {
   activeId?: string;
@@ -78,10 +76,9 @@ class DraggableList extends React.Component<Props, State> {
               <Item
                 value={items[activeIndex]}
                 renderItem={renderItem}
-                disabled={disabled}
                 wrapperStyle={wrapperStyle}
                 innerWrapperStyle={innerWrapperStyle}
-                style={{cursor: 'grabbing'}}
+                style={{cursor: disabled ? undefined : 'grabbing'}}
               />
             ) : null}
           </DragOverlay>,

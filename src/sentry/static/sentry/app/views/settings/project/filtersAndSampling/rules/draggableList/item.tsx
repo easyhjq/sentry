@@ -5,7 +5,6 @@ import styled from '@emotion/styled';
 
 export type ItemProps = {
   value: React.ReactNode;
-  disabled?: boolean;
   dragging?: boolean;
   index?: number;
   transform?: Transform | null;
@@ -32,7 +31,6 @@ export type ItemProps = {
 
 function Item({
   value,
-  disabled,
   dragging,
   index,
   transform,
@@ -60,7 +58,7 @@ function Item({
         } as React.CSSProperties
       }
     >
-      <InnerWrapper style={innerWrapperStyle} disabled={disabled}>
+      <InnerWrapper style={innerWrapperStyle}>
         {renderItem({
           dragging: Boolean(dragging),
           sorting: Boolean(sorting),
@@ -93,7 +91,7 @@ const Wrapper = styled('div')`
     0px 15px 15px 0 rgba(34, 33, 81, 0.25);
 `;
 
-const InnerWrapper = styled('div')<{disabled?: boolean}>`
+const InnerWrapper = styled('div')`
   cursor: default;
   position: relative;
   background-color: ${p => p.theme.white};
@@ -117,15 +115,4 @@ const InnerWrapper = styled('div')<{disabled?: boolean}>`
       box-shadow: var(--box-shadow-picked-up);
     }
   }
-
-  ${p =>
-    p.disabled &&
-    `
-      color: #999;
-      background-color: #f1f1f1;
-      &:focus {
-        box-shadow: 0 0px 4px 1px rgba(0, 0, 0, 0.1), $box-shadow;
-      }
-      cursor: not-allowed;
-    `}
 `;

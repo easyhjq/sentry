@@ -90,5 +90,6 @@ const CenteredColumn = styled(Column)`
 
 const IconGrabbableWrapper = styled('div')<{disabled: boolean}>`
   ${p => p.disabled && `color: ${p.theme.disabled}`};
-  cursor: grab;
+  cursor: ${p => (p.disabled ? 'not-allowed' : 'grab')};
+  outline: none;
 `;
