@@ -69,6 +69,7 @@ function Rule({
 export default Rule;
 
 const Columns = styled('div')`
+  cursor: default;
   display: grid;
   align-items: center;
   :not(:last-child) {

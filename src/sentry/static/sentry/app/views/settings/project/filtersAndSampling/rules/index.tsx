@@ -74,7 +74,7 @@ class Rules extends React.PureComponent<Props, State> {
         <DraggableList
           items={rules.map(rule => rule.id)}
           onUpdateItems={this.handleUpdateRules}
-          disabled
+          disabled={disabled}
           renderItem={({value, listeners, attributes, style: grabStyle}) => {
             const currentRule = rules.find(rule => rule.id === value);
 

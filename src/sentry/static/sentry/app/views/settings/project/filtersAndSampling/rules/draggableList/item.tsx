@@ -92,7 +92,6 @@ const Wrapper = styled('div')`
 `;
 
 const InnerWrapper = styled('div')`
-  cursor: default;
   position: relative;
   background-color: ${p => p.theme.white};
   -webkit-tap-highlight-color: transparent;
