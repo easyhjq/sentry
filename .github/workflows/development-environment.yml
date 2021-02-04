@@ -21,6 +21,20 @@ jobs:
     steps:
       - uses: actions/checkout@v2
 
+      - name: Set brew cache
+        if: ${{ runner.os == 'macOS' }}
+        shell: bash
+        run: echo "BREW_CACHE=`brew --cache`" >> $GITHUB_ENV
+
+      - name: Cache (brew)
+        uses: actions/cache@v2
+        if: ${{ runner.os == 'macOS' }}
+        with:
+          path: $BREW_CACHE
+          key: ${{ runner.os }}-brew-${{ hashFiles('Brewfile.automation.lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-brew
+
       - name: Install prerequisites
         if: ${{ runner.os == 'macOS' }}
         # Depending on the host watchman will not install (read: intermittent issue),
