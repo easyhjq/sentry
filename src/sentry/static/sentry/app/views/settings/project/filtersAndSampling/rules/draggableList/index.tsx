@@ -3,9 +3,13 @@ import {createPortal} from 'react-dom';
 import {DndContext, DragOverlay} from '@dnd-kit/core';
 import {arrayMove, SortableContext, verticalListSortingStrategy} from '@dnd-kit/sortable';
 
-import SortableItem from './sortableItem';
+import Item, {ItemProps} from './item';
+import SortableItem, {SortableItemProps} from './sortableItem';
 
-type Props = Pick<React.ComponentProps<typeof SortableItem>, 'renderItem'> & {
+type Props = Pick<
+  ItemProps,
+  'disabled' | 'renderItem' | 'innerWrapperStyle' | 'wrapperStyle'
+> & {
   items: Array<string>;
   onUpdateItems: (items: Array<string>) => void;
 };
@@ -23,7 +27,14 @@ class DraggableList extends React.Component<Props, State> {
 
   render() {
     const {activeId} = this.state;
-    const {items, onUpdateItems, renderItem} = this.props;
+    const {
+      items,
+      onUpdateItems,
+      renderItem,
+      wrapperStyle,
+      innerWrapperStyle,
+      disabled,
+    } = this.props;
 
     const getIndex = items.indexOf.bind(items);
     const activeIndex = activeId ? getIndex(activeId) : -1;
@@ -51,14 +62,28 @@ class DraggableList extends React.Component<Props, State> {
       >
         <SortableContext items={items} strategy={verticalListSortingStrategy}>
           {items.map(item => (
-            <SortableItem key={item} id={item} renderItem={renderItem} />
+            <SortableItem
+              key={item}
+              id={item}
+              renderItem={renderItem}
+              disabled={disabled}
+              wrapperStyle={wrapperStyle}
+              innerWrapperStyle={innerWrapperStyle}
+            />
           ))}
         </SortableContext>
         {createPortal(
           <DragOverlay>
-            {activeId
-              ? renderItem({value: items[activeIndex], style: {cursor: 'grabbing'}})
-              : null}
+            {activeId ? (
+              <Item
+                value={items[activeIndex]}
+                renderItem={renderItem}
+                disabled={disabled}
+                wrapperStyle={wrapperStyle}
+                innerWrapperStyle={innerWrapperStyle}
+                style={{cursor: 'grabbing'}}
+              />
+            ) : null}
           </DragOverlay>,
           document.body
         )}
@@ -68,3 +93,4 @@ class DraggableList extends React.Component<Props, State> {
 }
 
 export default DraggableList;
+export {ItemProps, SortableItemProps};
