@@ -10,12 +10,12 @@ export type ItemProps = {
   transform?: Transform | null;
   listeners?: DraggableSyntheticListeners;
   sorting?: boolean;
-  style?: React.CSSProperties;
   transition?: string;
-  wrapperStyle?: React.CSSProperties;
-  innerWrapperStyle?: React.CSSProperties;
   forwardRef?: React.Ref<HTMLElement>;
   attributes?: UseDraggableArguments['attributes'];
+  style?: React.CSSProperties;
+  wrapperStyle?: React.CSSProperties;
+  innerWrapperStyle?: React.CSSProperties;
   renderItem(args: {
     dragging: boolean;
     sorting: boolean;
@@ -36,13 +36,13 @@ function Item({
   transform,
   listeners,
   sorting,
-  style,
   transition,
-  wrapperStyle,
-  innerWrapperStyle,
   forwardRef,
   attributes,
   renderItem,
+  style,
+  wrapperStyle,
+  innerWrapperStyle,
 }: ItemProps) {
   return (
     <Wrapper
