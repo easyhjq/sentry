@@ -14,11 +14,16 @@ import Duration from 'app/components/duration';
 import * as Layout from 'app/components/layouts/thirds';
 import {Panel, PanelBody, PanelFooter} from 'app/components/panels';
 import Placeholder from 'app/components/placeholder';
+import {IconCheckmark} from 'app/icons/iconCheckmark';
+import {IconFire} from 'app/icons/iconFire';
+import {IconWarning} from 'app/icons/iconWarning';
 import {t, tct} from 'app/locale';
 import space from 'app/styles/space';
-import {Organization, Project, SelectValue} from 'app/types';
+import {NewQuery, Organization, Project, SelectValue} from 'app/types';
 import {defined} from 'app/utils';
 import {getUtcDateString} from 'app/utils/dates';
+import DiscoverQuery from 'app/utils/discover/discoverQuery';
+import EventView from 'app/utils/discover/eventView';
 import Projects from 'app/utils/projects';
 import {DATASET_EVENT_TYPE_FILTERS} from 'app/views/settings/incidentRules/constants';
 import {makeDefaultCta} from 'app/views/settings/incidentRules/incidentRulePresets';
@@ -31,7 +36,7 @@ import {
 } from 'app/views/settings/incidentRules/types';
 import {extractEventTypeFilterFromRule} from 'app/views/settings/incidentRules/utils/getEventTypeFilter';
 
-import {Incident} from '../../types';
+import {Incident, IncidentStatus} from '../../types';
 import {DATA_SOURCE_LABELS, getIncidentRuleMetricPreset} from '../../utils';
 
 import MetricChart from './metricChart';
@@ -109,6 +114,40 @@ export default class DetailsBody extends React.Component<Props> {
     });
   };
 
+  calculateSummaryPercentages(
+    incidents: Incident[] | undefined,
+    startTime: string,
+    endTime: string,
+    totalTime: number
+  ) {
+    let criticalPercent = '0';
+    let warningPercent = '0';
+    if (incidents) {
+      const startDate = moment.utc(startTime);
+      const filteredIncidents = incidents.filter(incident => {
+        return !incident.dateClosed || moment(incident.dateClosed).isAfter(startDate);
+      });
+      let criticalDuration = 0;
+      const warningDuration = 0;
+      for (const incident of filteredIncidents) {
+        // use the larger of the start of the incident or the start of the time period
+        const incidentStart = moment.max(moment(incident.dateStarted), startDate);
+        const incidentClose = incident.dateClosed
+          ? moment(incident.dateClosed)
+          : moment.utc(endTime);
+        criticalDuration += incidentClose.diff(incidentStart);
+      }
+      criticalPercent = ((criticalDuration / totalTime) * 100).toFixed(2);
+      warningPercent = ((warningDuration / totalTime) * 100).toFixed(2);
+    }
+    const resolvedPercent = (
+      100 -
+      (Number(criticalPercent) + Number(warningPercent))
+    ).toFixed(2);
+
+    return {criticalPercent, warningPercent, resolvedPercent};
+  }
+
   renderRuleDetails() {
     const {rule} = this.props;
 
@@ -171,8 +210,35 @@ export default class DetailsBody extends React.Component<Props> {
     );
   }
 
+  renderSummaryStatItems({
+    criticalPercent,
+    warningPercent,
+    resolvedPercent,
+  }: {
+    criticalPercent: string;
+    warningPercent: string;
+    resolvedPercent: string;
+  }) {
+    return (
+      <React.Fragment>
+        <StatItem>
+          <IconFire color="red300" />
+          <StatCount>{criticalPercent}%</StatCount>
+        </StatItem>
+        <StatItem>
+          <IconWarning color="yellow300" />
+          <StatCount>{warningPercent}%</StatCount>
+        </StatItem>
+        <StatItem>
+          <IconCheckmark color="green300" />
+          <StatCount>{resolvedPercent}%</StatCount>
+        </StatItem>
+      </React.Fragment>
+    );
+  }
+
   renderChartActions(projects: Project[]) {
-    const {rule, params} = this.props;
+    const {rule, params, incidents} = this.props;
     const timePeriod = this.getTimePeriod();
     const preset = this.metricPreset;
     const ctaOpts = {
@@ -187,15 +253,25 @@ export default class DetailsBody extends React.Component<Props> {
       ? preset.makeCtaParams(ctaOpts)
       : makeDefaultCta(ctaOpts);
 
+    const percentages = this.calculateSummaryPercentages(
+      incidents,
+      timePeriod.start,
+      timePeriod.end,
+      TIME_WINDOWS[timePeriod.value]
+    );
+
     return (
-      // Currently only one button in panel, hide panel if not available
-      <Feature features={['discover-basic']}>
-        <ChartActions>
+      <ChartActions>
+        <ChartSummary>
+          <SummaryText>{t('SUMMARY')}</SummaryText>
+          <SummaryStats>{this.renderSummaryStatItems(percentages)}</SummaryStats>
+        </ChartSummary>
+        <Feature features={['discover-basic']}>
           <Button size="small" priority="primary" disabled={!rule} {...props}>
             {buttonText}
           </Button>
-        </ChartActions>
-      </Feature>
+        </Feature>
+      </ChartActions>
     );
   }
 
@@ -217,6 +293,87 @@ export default class DetailsBody extends React.Component<Props> {
           {this.renderRuleDetails()}
         </Layout.Side>
       </Layout.Body>
+    );
+  }
+
+  render30DaySummary(
+    query: string,
+    projects: number[],
+    environment: string[] | undefined
+  ) {
+    const {incidents, location, organization} = this.props;
+
+    // get current status
+    const activeIncident = incidents?.find(({dateClosed}) => !dateClosed);
+    const status = activeIncident ? activeIncident.status : IncidentStatus.CLOSED;
+    let statusText = t('Resolved');
+    let statusIcon = <IconCheckmark color="white" />;
+    if (status === IncidentStatus.CRITICAL) {
+      statusText = t('Critical');
+      statusIcon = <IconFire color="white" />;
+    } else if (status === IncidentStatus.WARNING) {
+      statusText = t('Warning');
+      statusIcon = <IconWarning color="white" />;
+    }
+
+    const eventUserCountQuery: NewQuery = {
+      id: undefined,
+      version: 2,
+      name: 'eventsUserEventView',
+      query,
+      projects,
+      environment,
+      range: '30d',
+      fields: ['count()', 'count_unique(user.id)'],
+    };
+
+    const eventUserEventView = EventView.fromSavedQuery(eventUserCountQuery);
+
+    const now = moment.utc();
+    const totalTime = TimeWindow.ONE_DAY * 30 * 60 * 1000;
+    const start = getUtcDateString(moment(now.diff(totalTime)));
+    const end = getUtcDateString(now);
+
+    const percentages = this.calculateSummaryPercentages(
+      incidents,
+      start,
+      end,
+      totalTime
+    );
+
+    return (
+      <React.Fragment>
+        <DiscoverQuery
+          location={location}
+          orgSlug={organization.slug}
+          eventView={eventUserEventView}
+        >
+          {({isLoading, tableData}) => {
+            let eventCount, userCount;
+            if (!isLoading && tableData?.data) {
+              const {count, count_unique_user_id} = tableData.data[0];
+              eventCount = count;
+              userCount = count_unique_user_id;
+            }
+            return (
+              <GroupedHeaderItems>
+                <ItemTitle>{t('Current Status')}</ItemTitle>
+                <ItemTitle>{t('Events')}</ItemTitle>
+                <ItemTitle>{t('Users')}</ItemTitle>
+                <IncidentStatusItemValue status={status}>
+                  <IconBackdrop status={status}>{statusIcon}</IconBackdrop> {statusText}
+                </IncidentStatusItemValue>
+                <ItemValue>{eventCount ?? <Placeholder height="24px" />}</ItemValue>
+                <ItemValue>{userCount ?? <Placeholder height="24px" />}</ItemValue>
+              </GroupedHeaderItems>
+            );
+          }}
+        </DiscoverQuery>
+        <ItemTitle>{t('Last 30 Days')}</ItemTitle>
+        <SidebarSummaryStats>
+          {this.renderSummaryStatItems(percentages)}
+        </SidebarSummaryStats>
+      </React.Fragment>
     );
   }
 
@@ -304,6 +461,11 @@ export default class DetailsBody extends React.Component<Props> {
                 </DetailWrapper>
               </Layout.Main>
               <Layout.Side>
+                {this.render30DaySummary(
+                  queryWithTypeFilter,
+                  (projects as Project[]).map(p => Number(p.id)),
+                  environment ? [environment] : undefined
+                )}
                 <ChartParameters>
                   {tct('Metric: [metric] over [window]', {
                     metric: <code>{rule?.aggregate ?? '\u2026'}</code>,
@@ -356,6 +518,64 @@ const ActivityWrapper = styled('div')`
   width: 100%;
 `;
 
+const GroupedHeaderItems = styled('div')`
+  display: grid;
+  grid-template-columns: repeat(3, max-content);
+  grid-gap: ${space(1)} ${space(4)};
+  text-align: right;
+  margin-top: ${space(1)};
+  margin-bottom: ${space(4)};
+`;
+
+const ItemTitle = styled('h6')`
+  font-size: ${p => p.theme.fontSizeSmall};
+  margin-bottom: 0;
+  text-transform: uppercase;
+  color: ${p => p.theme.gray300};
+  letter-spacing: 0.1px;
+`;
+
+const ItemValue = styled('div')`
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  font-size: ${p => p.theme.fontSizeExtraLarge};
+`;
+
+const IncidentStatusItemValue = styled(ItemValue)<{status: IncidentStatus}>`
+  color: ${p =>
+    p.status === IncidentStatus.WARNING
+      ? p.theme.yellow300
+      : p.status === IncidentStatus.CRITICAL
+      ? p.theme.red300
+      : p.theme.green300};
+`;
+
+const IconBackdrop = styled('div')<{status: IncidentStatus}>`
+  position: relative;
+  z-index: 0;
+  margin-right: ${space(1.5)};
+
+  &:before {
+    display: block;
+    content: '';
+    width: 20px;
+    height: 20px;
+    top: 1px;
+    left: -2px;
+    border-radius: 2px;
+    background-color: ${p =>
+      p.status === IncidentStatus.WARNING
+        ? p.theme.yellow300
+        : p.status === IncidentStatus.CRITICAL
+        ? p.theme.red300
+        : p.theme.green300};
+    position: absolute;
+    transform: rotate(45deg);
+    z-index: -1;
+  }
+`;
+
 const SidebarHeading = styled(SectionHeading)`
   display: flex;
   justify-content: space-between;
@@ -372,7 +592,42 @@ const ChartHeader = styled('header')`
 const ChartActions = styled(PanelFooter)`
   display: flex;
   justify-content: flex-end;
+  align-items: center;
   padding: ${space(2)};
+`;
+
+const ChartSummary = styled('div')`
+  display: flex;
+  margin-right: auto;
+`;
+
+const SummaryText = styled('span')`
+  margin-top: ${space(0.25)};
+  font-weight: bold;
+  font-size: ${p => p.theme.fontSizeSmall};
+`;
+
+const SummaryStats = styled('div')`
+  display: flex;
+  align-items: center;
+  margin: 0 ${space(2)};
+`;
+
+const SidebarSummaryStats = styled(SummaryStats)`
+  margin: 0 0 ${space(4)} 0;
+  font-size: ${p => p.theme.fontSizeMedium};
+`;
+
+const StatItem = styled('div')`
+  display: flex;
+  align-items: center;
+  margin: 0 ${space(2)} 0 0;
+`;
+
+const StatCount = styled('span')`
+  margin-left: ${space(0.5)};
+  margin-top: ${space(0.25)};
+  color: black;
 `;
 
 const ChartParameters = styled('div')`
